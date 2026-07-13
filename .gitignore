@@ -1,0 +1,13 @@
+.gradle
+build/
+app/build/
+local.properties
+.idea
+*.iml
+.DS_Store
+*.apk
+*.aar
+*.so
+ffmpeg_kit_build/
+.env
+
