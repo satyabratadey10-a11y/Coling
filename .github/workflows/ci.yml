@@ -48,7 +48,7 @@ jobs:
         
         # Compile arm64-v8a only, targeting default 4KB page alignment
         export ANDROID_NDK_HOME=${{ env.ANDROID_NDK_HOME }}
-        ./android.sh --disable-arm-v7a --disable-x86 --disable-x86-64 --disable-x86_64 --enable-gpl
+        ./android.sh --disable-arm-v7a --disable-x86 --disable-x86-64 --enable-gpl
         
         # Move output AAR to target app/libs directory
         mkdir -p ../app/libs/
