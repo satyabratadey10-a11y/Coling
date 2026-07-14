@@ -52,7 +52,7 @@ jobs:
         
         # Move output AAR to target app/libs directory
         mkdir -p ../app/libs/
-        cp prebuilt/android-aar/ffmpeg-kit-full-gpl.aar ../app/libs/ffmpeg-kit.aar
+        find prebuilt -name "*.aar" -exec cp {} ../app/libs/ffmpeg-kit.aar \;
         cd ..
 
     - name: Setup Gradle
