@@ -42,6 +42,11 @@ data class TimelineClip(
     val color: Color
 )
 
+enum class ClipType {
+    VIDEO, AUDIO, TITLE
+}
+
+
 @Composable
 fun EditScreen() {
     var isPlaying by remember { mutableStateOf(false) }

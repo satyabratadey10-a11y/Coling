@@ -31,6 +31,8 @@ import com.example.coling.ui.theme.PrimaryAccent
 import com.example.coling.ui.theme.SecondaryAccent
 import com.example.coling.ui.theme.TextSecondary
 import java.io.File
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.foundation.BorderStroke
 
 data class MediaMetadata(
     val fileName: String,
@@ -325,4 +327,3 @@ fun MetaField(label: String, value: String, isTabular: Boolean = false) {
     }
 }
 
-import androidx.compose.foundation.BorderStroke
