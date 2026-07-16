@@ -31,6 +31,8 @@ import com.example.coling.ui.theme.SecondaryAccent
 import com.example.coling.ui.theme.TextSecondary
 import kotlin.math.cos
 import kotlin.math.sin
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material3.RangeSlider
 
 data class ColorNode(
     val id: Int,
@@ -38,6 +40,11 @@ data class ColorNode(
     var type: NodeType,
     var isEnabled: Boolean = true
 )
+
+enum class NodeType {
+    SERIAL, PARALLEL
+}
+
 
 @Composable
 fun ColorScreen() {
@@ -543,5 +550,3 @@ fun QualifierSlider(name: String, range: ClosedFloatingPointRange<Float>) {
     }
 }
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.material3.RangeSlider
