@@ -65,14 +65,18 @@ jobs:
 
     - name: Commit and Push compiled FFmpeg AAR to Repository
       run: |
-        if git status --porcelain | grep -q "app/libs/ffmpeg-kit.aar"; then
+        if [ -f app/libs/ffmpeg-kit.aar ]; then
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add app/libs/ffmpeg-kit.aar
-          git commit -m "Check in compiled FFmpeg AAR [skip ci]"
-          git push origin HEAD:${{ github.ref }}
+          git add -f app/libs/ffmpeg-kit.aar
+          if ! git diff --cached --quiet; then
+            git commit -m "Check in compiled FFmpeg AAR [skip ci]"
+            git push origin HEAD:${{ github.ref }}
+          else
+            echo "FFmpeg AAR has not changed. Skipping commit."
+          fi
         else
-          echo "No new FFmpeg AAR compiled, skipping commit."
+          echo "FFmpeg AAR not found, skipping commit."
         fi
 
     - name: Setup Gradle
