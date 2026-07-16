@@ -1,7 +1,6 @@
 package com.example.coling.ui.screens
 
 import android.widget.Toast
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -12,9 +11,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -26,6 +23,11 @@ import com.example.coling.ui.theme.PrimaryAccent
 import com.example.coling.ui.theme.SecondaryAccent
 import com.example.coling.ui.theme.TextSecondary
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.Stroke
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 data class ExportPreset(
     val id: String,
@@ -35,10 +37,19 @@ data class ExportPreset(
     val ratio: String
 )
 
+/**
+ * Export sheet content — designed to be hosted inside a ModalBottomSheet.
+ * @param onDismiss callback when the sheet should be dismissed
+ * @param onExportStarted callback to notify parent that an export is running (for progress chip)
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DeliverScreen() {
+fun ExportSheetContent(
+    onDismiss: () -> Unit = {},
+    onExportStarted: (Boolean) -> Unit = {}
+) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     val presets = listOf(
         ExportPreset("youtube", "YouTube / Vimeo", "1080p (FHD)", "H.264 (AVC)", "16:9 Landscape"),
@@ -57,7 +68,6 @@ fun DeliverScreen() {
 
     var isExporting by remember { mutableStateOf(false) }
     var exportProgress by remember { mutableStateOf(0f) }
-    var exportTaskJob by remember { mutableStateOf<Thread?>(null) }
     var currentPhaseText by remember { mutableStateOf("Ready to render") }
 
     // Sync state when preset changes
@@ -70,22 +80,28 @@ fun DeliverScreen() {
 
     Column(
         modifier = Modifier
-            .fillMaxSize()
-            .padding(12.dp),
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .padding(bottom = 24.dp)
+            .navigationBarsPadding(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        // Drag handle is provided by ModalBottomSheet, so just start with title
         Text(
             text = "Export & Deliver",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+            modifier = Modifier.padding(bottom = 4.dp)
         )
 
         // 1. Presets Selection Row
         Text(
-            text = "Delivery Presets",
-            fontSize = 11.sp,
+            text = "DELIVERY PRESETS",
+            fontSize = 10.sp,
             fontWeight = FontWeight.Bold,
-            color = TextSecondary
+            color = TextSecondary,
+            letterSpacing = 1.sp
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -96,7 +112,7 @@ fun DeliverScreen() {
                 Card(
                     modifier = Modifier
                         .weight(1f)
-                        .height(70.dp)
+                        .height(64.dp)
                         .clickable { activePresetId = preset.id },
                     colors = CardDefaults.cardColors(
                         containerColor = if (isSelected) Color(0xFF1E293B) else DarkSurface
@@ -112,15 +128,15 @@ fun DeliverScreen() {
                     ) {
                         Text(
                             text = preset.name,
-                            fontSize = 10.sp,
+                            fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
                             maxLines = 1
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = preset.codec.split(" ")[0] + " | " + preset.resolution.split(" ")[0],
-                            fontSize = 9.sp,
+                            fontSize = 8.sp,
                             color = TextSecondary
                         )
                     }
@@ -131,16 +147,16 @@ fun DeliverScreen() {
         // 2. Output Configurations
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = DarkSurface),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
             border = BorderStroke(1.dp, BorderColor)
         ) {
             Column(
                 modifier = Modifier.padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text("Export Profile Settings", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = PrimaryAccent)
+                Text("Export Settings", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = PrimaryAccent)
 
-                // Aspect ratio picker with graphical preview
+                // Aspect ratio picker
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -160,10 +176,9 @@ fun DeliverScreen() {
                         }
                     }
 
-                    // Mini preview monitor representing chosen ratio shape
                     Canvas(
                         modifier = Modifier
-                            .size(50.dp)
+                            .size(44.dp)
                             .background(Color.Black, RoundedCornerShape(4.dp))
                             .border(1.dp, BorderColor, RoundedCornerShape(4.dp))
                     ) {
@@ -184,7 +199,7 @@ fun DeliverScreen() {
                     }
                 }
 
-                Divider(color = BorderColor)
+                HorizontalDivider(color = BorderColor)
 
                 // Resolution
                 Column {
@@ -225,8 +240,6 @@ fun DeliverScreen() {
             }
         }
 
-        Spacer(modifier = Modifier.weight(1f))
-
         // 3. Render Status & Controls
         if (isExporting) {
             Card(
@@ -260,7 +273,7 @@ fun DeliverScreen() {
                     }
 
                     LinearProgressIndicator(
-                        progress = exportProgress,
+                        progress = { exportProgress },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(6.dp)
@@ -269,7 +282,6 @@ fun DeliverScreen() {
                         trackColor = Color.Black
                     )
 
-                    // Render speed & frame counting metrics
                     val framesDone = (exportProgress * 600).toInt()
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -288,7 +300,7 @@ fun DeliverScreen() {
                             style = TextStyle(fontFeatureSettings = "tnum")
                         )
                         Text(
-                            text = "Est:\u00A0${((600 - framesDone) / 24)}s",
+                            text = "Est:\u00A0${if (framesDone < 600) ((600 - framesDone) / 24) else 0}s",
                             fontSize = 10.sp,
                             color = TextSecondary,
                             style = TextStyle(fontFeatureSettings = "tnum")
@@ -297,10 +309,10 @@ fun DeliverScreen() {
 
                     Button(
                         onClick = {
-                            exportTaskJob?.interrupt()
                             isExporting = false
                             exportProgress = 0f
                             currentPhaseText = "Export cancelled"
+                            onExportStarted(false)
                             Toast.makeText(context, "Export cancelled!", Toast.LENGTH_SHORT).show()
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
@@ -318,38 +330,33 @@ fun DeliverScreen() {
                 onClick = {
                     isExporting = true
                     exportProgress = 0f
-                    val thread = Thread {
-                        try {
-                            currentPhaseText = "Initializing rendering buffers…"
-                            Thread.sleep(600)
-                            
-                            currentPhaseText = "Evaluating C++ grading nodes…"
-                            for (p in 1..85) {
-                                Thread.sleep(30)
-                                exportProgress = p / 100f
-                            }
+                    onExportStarted(true)
 
-                            currentPhaseText = "Muxing video containers…"
-                            for (p in 86..100) {
-                                Thread.sleep(40)
-                                exportProgress = p / 100f
-                            }
-                            
-                            isExporting = false
-                            currentPhaseText = "Ready to render"
-                            (context as? android.app.Activity)?.runOnUiThread {
-                                Toast.makeText(context, "Render complete! Saved 14.5\u00A0MB to Movies folder", Toast.LENGTH_LONG).show()
-                            }
-                        } catch (e: InterruptedException) {
-                            // Interrupted / Cancelled
+                    scope.launch {
+                        currentPhaseText = "Initializing rendering buffers\u2026"
+                        delay(600)
+
+                        currentPhaseText = "Evaluating C++ grading nodes\u2026"
+                        for (p in 1..85) {
+                            delay(30)
+                            exportProgress = p / 100f
                         }
+
+                        currentPhaseText = "Muxing video containers\u2026"
+                        for (p in 86..100) {
+                            delay(40)
+                            exportProgress = p / 100f
+                        }
+
+                        isExporting = false
+                        onExportStarted(false)
+                        currentPhaseText = "Ready to render"
+                        Toast.makeText(context, "Render complete! Saved 14.5\u00A0MB to Movies folder", Toast.LENGTH_LONG).show()
                     }
-                    exportTaskJob = thread
-                    thread.start()
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(50.dp),
+                    .height(48.dp),
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryAccent)
             ) {
@@ -358,4 +365,3 @@ fun DeliverScreen() {
         }
     }
 }
-

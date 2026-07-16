@@ -23,8 +23,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.coling.ui.theme.BorderColor
@@ -71,7 +74,7 @@ fun EditScreen() {
             .fillMaxSize()
             .padding(12.dp)
     ) {
-        // 1. Preview Monitor with Safe Zones & Mock Graded Graphics
+        // 1. Preview Monitor
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -81,40 +84,22 @@ fun EditScreen() {
                 .border(1.dp, BorderColor, RoundedCornerShape(8.dp)),
             contentAlignment = Alignment.Center
         ) {
+            // Real preview placeholder — will show actual frames when native pipeline is wired
+            Box(
+                modifier = Modifier.fillMaxSize().background(Color.Black),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Preview (static frame)",
+                    color = TextSecondary,
+                    fontSize = 12.sp
+                )
+            }
+
+            // Safe zone grid overlay (real feature, keep it)
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val w = size.width
                 val h = size.height
-
-                // Draw mountains and gradient sky
-                val skyBrush = Brush.verticalGradient(
-                    colors = listOf(Color(0xFF1E1B4B), Color(0xFF4C1D95), Color(0xFFBE185D))
-                )
-                drawRect(skyBrush, topLeft = Offset.Zero, size = size)
-
-                // Sun
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(Color(0xFFFDE047), Color(0xFFF97316), Color.Transparent)
-                    ),
-                    radius = 45.dp.toPx(),
-                    center = Offset(w / 2, h / 1.7f)
-                )
-
-                // Mountain path
-                val mountainPath = Path().apply {
-                    moveTo(0f, h)
-                    lineTo(w * 0.3f, h * 0.6f)
-                    lineTo(w * 0.55f, h * 0.75f)
-                    lineTo(w * 0.8f, h * 0.55f)
-                    lineTo(w, h)
-                    close()
-                }
-                drawPath(
-                    path = mountainPath,
-                    color = Color(0xFF0F172A)
-                )
-
-                // Grid safe lines (80% and 90% boundary)
                 drawRect(
                     color = Color.White.copy(alpha = 0.15f),
                     topLeft = Offset(w * 0.05f, h * 0.05f),
@@ -146,34 +131,6 @@ fun EditScreen() {
                 )
             }
 
-            // Resolution and playhead position overlays
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.TopStart)
-                    .padding(8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "PROXY\u00A01080p",
-                    color = SecondaryAccent,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                )
-                Text(
-                    text = "HW\u00A0DEC",
-                    color = Color.Green,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                )
-            }
-
             // Bottom playhead metrics
             Text(
                 text = "FRAME\u00A0${String.format("%04d", currentFrame)}\u00A0/\u00A0${String.format("%04d", totalFrames)}",
@@ -190,7 +147,7 @@ fun EditScreen() {
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // 2. Playback Transport Bar (DaVinci style console)
+        // 2. Playback Transport Bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -212,7 +169,7 @@ fun EditScreen() {
             ) {
                 Icon(Icons.Default.ArrowBack, contentDescription = "Step backward one frame")
             }
-            
+
             Spacer(modifier = Modifier.width(8.dp))
             FilledIconButton(
                 onClick = { isPlaying = !isPlaying },
@@ -269,7 +226,7 @@ fun EditScreen() {
                         if (playheadOffset > 10 && playheadOffset < selected.durationFrames - 10) {
                             val newDuration = selected.durationFrames - playheadOffset
                             selected.durationFrames = playheadOffset
-                            
+
                             val splitClip = TimelineClip(
                                 id = selected.id + "_split",
                                 name = selected.name.replace(".mp4", "") + "\u00A0(Part\u00A02)",
@@ -362,22 +319,17 @@ fun EditScreen() {
                     .background(Color(0xFF0F172A))
             ) {
                 val tickGap = size.width / 5
-                val rulerPaint = Stroke(width = 1.dp.toPx())
 
                 for (i in 0..5) {
                     val x = i * tickGap
                     drawLine(Color(0xFF475569), Offset(x, size.height), Offset(x, size.height - 12.dp.toPx()), 1.dp.toPx())
-                    // Ticks every 4 seconds (120f)
-                    val labelSeconds = i * 4
-                    val labelText = "00:${String.format("%02d", labelSeconds)}"
-                    // Simply visualize lines, can render text if needed
                 }
                 // Playhead line
                 val playheadX = (currentFrame.toFloat() / totalFrames) * size.width
                 drawLine(Color.Red, Offset(playheadX, 0f), Offset(playheadX, size.height), 2.dp.toPx())
             }
 
-            Divider(color = BorderColor)
+            HorizontalDivider(color = BorderColor)
 
             LazyColumn(
                 modifier = Modifier
@@ -407,26 +359,31 @@ fun EditScreen() {
                             fontWeight = FontWeight.Black
                         )
                         Spacer(modifier = Modifier.height(4.dp))
-                        Box(
+
+                        // Use BoxWithConstraints for correct percentage-based positioning
+                        BoxWithConstraints(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(44.dp)
                                 .background(Color.Black.copy(alpha = 0.4f))
                         ) {
+                            val trackWidthPx = constraints.maxWidth
+                            val density = LocalDensity.current
+
                             trackClips.forEach { clip ->
-                                val leftWeight = clip.startFrame.toFloat() / totalFrames
-                                val widthWeight = clip.durationFrames.toFloat() / totalFrames
+                                val leftFraction = clip.startFrame.toFloat() / totalFrames
+                                val widthFraction = clip.durationFrames.toFloat() / totalFrames
                                 val isSelected = selectedClipId == clip.id
+
+                                val clipWidthDp = with(density) { (widthFraction * trackWidthPx).toDp() }
+                                val clipOffsetX = (leftFraction * trackWidthPx).toInt()
 
                                 Box(
                                     modifier = Modifier
+                                        .offset { IntOffset(clipOffsetX, 0) }
+                                        .width(clipWidthDp)
                                         .fillMaxHeight()
-                                        .fillMaxWidth(widthWeight)
-                                        .padding(
-                                            start = (leftWeight * 320).dp, // Simple relative alignment mapping
-                                            top = 2.dp,
-                                            bottom = 2.dp
-                                        )
+                                        .padding(vertical = 2.dp)
                                         .clip(RoundedCornerShape(4.dp))
                                         .background(
                                             if (isSelected) clip.color.copy(alpha = 0.5f) else clip.color
@@ -453,7 +410,6 @@ fun EditScreen() {
                                             maxLines = 1
                                         )
                                         if (isSelected) {
-                                            // Draw subtle resize handles
                                             Box(
                                                 modifier = Modifier
                                                     .width(4.dp)

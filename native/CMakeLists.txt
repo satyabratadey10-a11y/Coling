@@ -16,6 +16,7 @@ find_library(egl-lib EGL)
 # Source files
 set(SOURCE_FILES
     jni/coling-jni.cpp
+    core/color_engine.cpp
 )
 
 # Shared library target

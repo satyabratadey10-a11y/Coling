@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("com.google.devtools.ksp")
 }
 
 android {
@@ -83,8 +84,12 @@ dependencies {
     val roomVersion = "2.6.1"
     implementation("androidx.room:room-runtime:$roomVersion")
     implementation("androidx.room:room-ktx:$roomVersion")
-    // Use annotationProcessor for simplicity in standard Gradle configs, avoiding additional KSP plugin setups
-    annotationProcessor("androidx.room:room-compiler:$roomVersion")
+    ksp("androidx.room:room-compiler:$roomVersion")
+
+    // Coroutines
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    // Lifecycle ViewModel Compose
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
 
     // FFmpeg-Kit local AAR (built from source in CI/cached)
     implementation(files("libs/ffmpeg-kit.aar"))

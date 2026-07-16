@@ -1,6 +1,10 @@
 package com.example.coling.ui.screens
 
+import android.content.Intent
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -12,6 +16,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,9 +39,14 @@ import com.example.coling.ui.theme.DarkSurface
 import com.example.coling.ui.theme.PrimaryAccent
 import com.example.coling.ui.theme.SecondaryAccent
 import com.example.coling.ui.theme.TextSecondary
+import com.example.coling.utils.getFileName
+import com.example.coling.utils.probeMediaFromUri
 import java.io.File
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.BorderStroke
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class MediaMetadata(
     val fileName: String,
@@ -52,10 +63,41 @@ data class MediaMetadata(
 @Composable
 fun MediaScreen() {
     val context = LocalContext.current
-    var inputPath by remember { mutableStateOf("/sdcard/Download/sample.mp4") }
+    val scope = rememberCoroutineScope()
     var mediaList by remember { mutableStateOf(listOf<MediaMetadata>()) }
     var selectedMedia by remember { mutableStateOf<MediaMetadata?>(null) }
     var isLoading by remember { mutableStateOf(false) }
+    var showAdvancedImport by remember { mutableStateOf(false) }
+    var inputPath by remember { mutableStateOf("") }
+
+    // SAF document picker
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            isLoading = true
+            scope.launch {
+                uris.forEach { uri ->
+                    // Persist permission across process death
+                    try {
+                        context.contentResolver.takePersistableUriPermission(
+                            uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        )
+                    } catch (_: Exception) { /* Some providers don't support persistable */ }
+
+                    val fileName = withContext(Dispatchers.IO) {
+                        getFileName(context, uri)
+                    }
+                    val meta = withContext(Dispatchers.IO) {
+                        probeMediaFromUri(context, uri, fileName)
+                    }
+                    mediaList = mediaList + meta
+                    selectedMedia = meta
+                }
+                isLoading = false
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -75,86 +117,126 @@ fun MediaScreen() {
             modifier = Modifier.padding(bottom = 16.dp)
         )
 
-        // Import Section
+        // Primary Import Button (SAF)
+        Button(
+            onClick = {
+                importLauncher.launch(arrayOf("video/*", "image/*", "audio/*"))
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp),
+            shape = RoundedCornerShape(8.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = PrimaryAccent)
+        ) {
+            Icon(Icons.Default.Add, contentDescription = "Import media")
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Import Media", fontWeight = FontWeight.Bold)
+        }
+
+        // Advanced: paste-a-path fallback (collapsible)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 16.dp),
+                .padding(top = 8.dp)
+                .clickable { showAdvancedImport = !showAdvancedImport },
             verticalAlignment = Alignment.CenterVertically
         ) {
-            OutlinedTextField(
-                value = inputPath,
-                onValueChange = { inputPath = it },
-                label = { Text("Video file path") },
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(end = 8.dp),
-                singleLine = true,
-                shape = RoundedCornerShape(8.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = PrimaryAccent,
-                    unfocusedBorderColor = BorderColor,
-                    focusedContainerColor = Color(0xFF0F172A),
-                    unfocusedContainerColor = Color(0xFF0F172A)
-                )
+            Text(
+                text = "Advanced: paste file path",
+                fontSize = 11.sp,
+                color = TextSecondary
             )
+            Icon(
+                imageVector = if (showAdvancedImport) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                contentDescription = "Toggle advanced import",
+                tint = TextSecondary,
+                modifier = Modifier.size(16.dp)
+            )
+        }
 
-            Button(
-                onClick = {
-                    val file = File(inputPath)
-                    if (!file.exists()) {
-                        Toast.makeText(context, "File path not found! Adding mock clip.", Toast.LENGTH_SHORT).show()
-                        val mockMeta = MediaMetadata(
-                            fileName = file.name.ifEmpty { "camera_grade_test.mp4" },
-                            filePath = inputPath,
-                            format = "MPEG-4 / QuickTime",
-                            duration = "24.50s",
-                            size = "45.2 MB",
-                            videoCodec = "h264 (High 10-bit)",
-                            audioCodec = "aac (LC)",
-                            resolution = "1920x1080"
-                        )
-                        mediaList = mediaList + mockMeta
-                        selectedMedia = mockMeta
-                    } else {
-                        isLoading = true
-                        Thread {
-                            try {
-                                val session = com.arthenica.ffmpegkit.FFprobeKit.getMediaInformation(inputPath)
-                                val info = session.mediaInformation
-                                if (info != null) {
-                                    val videoStream = info.streams.firstOrNull { it.type == "video" }
-                                    val audioStream = info.streams.firstOrNull { it.type == "audio" }
-                                    val meta = MediaMetadata(
-                                        fileName = file.name,
-                                        filePath = inputPath,
-                                        format = info.format ?: "unknown",
-                                        duration = "${"%.2f".format((info.duration?.toDoubleOrNull() ?: 0.0))}s",
-                                        size = "${"%.1f".format(file.length() / (1024.0 * 1024.0))}\u00A0MB",
-                                        videoCodec = videoStream?.codec ?: "none",
-                                        audioCodec = audioStream?.codec ?: "none",
-                                        resolution = if (videoStream != null) "${videoStream.width}x${videoStream.height}" else "N/A"
-                                    )
-                                    mediaList = mediaList + meta
-                                    selectedMedia = meta
-                                }
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                            } finally {
-                                isLoading = false
-                            }
-                        }.start()
-                    }
-                },
-                modifier = Modifier.height(56.dp),
-                shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = PrimaryAccent)
+        AnimatedVisibility(visible = showAdvancedImport) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Add clip")
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Add Clip")
+                OutlinedTextField(
+                    value = inputPath,
+                    onValueChange = { inputPath = it },
+                    label = { Text("File path") },
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 8.dp),
+                    singleLine = true,
+                    shape = RoundedCornerShape(8.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = PrimaryAccent,
+                        unfocusedBorderColor = BorderColor,
+                        focusedContainerColor = Color(0xFF0F172A),
+                        unfocusedContainerColor = Color(0xFF0F172A)
+                    )
+                )
+
+                Button(
+                    onClick = {
+                        if (inputPath.isBlank()) return@Button
+                        isLoading = true
+                        scope.launch {
+                            val file = File(inputPath)
+                            val meta = if (file.exists()) {
+                                withContext(Dispatchers.IO) {
+                                    try {
+                                        val session = com.arthenica.ffmpegkit.FFprobeKit.getMediaInformation(inputPath)
+                                        val info = session.mediaInformation
+                                        if (info != null) {
+                                            val videoStream = info.streams.firstOrNull { it.type == "video" }
+                                            val audioStream = info.streams.firstOrNull { it.type == "audio" }
+                                            MediaMetadata(
+                                                fileName = file.name,
+                                                filePath = inputPath,
+                                                format = info.format ?: "unknown",
+                                                duration = "${"%.2f".format((info.duration?.toDoubleOrNull() ?: 0.0))}s",
+                                                size = "${"%.1f".format(file.length() / (1024.0 * 1024.0))}\u00A0MB",
+                                                videoCodec = videoStream?.codec ?: "none",
+                                                audioCodec = audioStream?.codec ?: "none",
+                                                resolution = if (videoStream != null) "${videoStream.width}x${videoStream.height}" else "N/A"
+                                            )
+                                        } else null
+                                    } catch (e: Exception) {
+                                        null
+                                    }
+                                }
+                            } else {
+                                // File not found — add placeholder
+                                MediaMetadata(
+                                    fileName = file.name.ifEmpty { "unknown.mp4" },
+                                    filePath = inputPath,
+                                    format = "MPEG-4 / QuickTime",
+                                    duration = "N/A",
+                                    size = "N/A",
+                                    videoCodec = "h264",
+                                    audioCodec = "aac",
+                                    resolution = "N/A"
+                                )
+                            }
+                            if (meta != null) {
+                                mediaList = mediaList + meta
+                                selectedMedia = meta
+                            }
+                            isLoading = false
+                        }
+                    },
+                    modifier = Modifier.height(56.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E293B))
+                ) {
+                    Text("Add")
+                }
             }
         }
+
+        Spacer(modifier = Modifier.height(8.dp))
 
         if (isLoading) {
             Column(
@@ -170,7 +252,7 @@ fun MediaScreen() {
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "Probing file metadata…",
+                    text = "Probing file metadata\u2026",
                     fontSize = 11.sp,
                     color = SecondaryAccent
                 )
@@ -178,7 +260,7 @@ fun MediaScreen() {
         }
 
         // Empty state / List Split
-        if (mediaList.isEmpty()) {
+        if (mediaList.isEmpty() && !isLoading) {
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -194,7 +276,6 @@ fun MediaScreen() {
                     verticalArrangement = Arrangement.Center
                 ) {
                     Canvas(modifier = Modifier.size(80.dp)) {
-                        // Draw empty media folder shape
                         val pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
                         drawRoundRect(
                             color = BorderColor,
@@ -203,7 +284,6 @@ fun MediaScreen() {
                             cornerRadius = androidx.compose.ui.geometry.CornerRadius(8.dp.toPx()),
                             style = Stroke(width = 2.dp.toPx(), pathEffect = pathEffect)
                         )
-                        // Folder tab
                         drawRoundRect(
                             color = BorderColor,
                             topLeft = Offset(15.dp.toPx(), 10.dp.toPx()),
@@ -220,13 +300,13 @@ fun MediaScreen() {
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Enter a file path above and tap Add Clip to start.",
+                        text = "Tap Import Media to add clips from your device.",
                         fontSize = 12.sp,
                         color = TextSecondary
                     )
                 }
             }
-        } else {
+        } else if (mediaList.isNotEmpty()) {
             Column(
                 modifier = Modifier.weight(1f)
             ) {
@@ -250,20 +330,27 @@ fun MediaScreen() {
                         ListItem(
                             leadingContent = { MediaThumbnail(item.fileName) },
                             headlineContent = { Text(item.fileName, fontWeight = FontWeight.Bold) },
-                            supportingContent = { Text(item.filePath, color = TextSecondary, fontSize = 11.sp) },
-                            trailingContent = { 
+                            supportingContent = {
                                 Text(
-                                    text = item.resolution, 
-                                    color = SecondaryAccent, 
+                                    text = if (item.filePath.startsWith("content://")) "SAF Import" else item.filePath,
+                                    color = TextSecondary,
+                                    fontSize = 11.sp,
+                                    maxLines = 1
+                                )
+                            },
+                            trailingContent = {
+                                Text(
+                                    text = item.resolution,
+                                    color = SecondaryAccent,
                                     style = TextStyle(fontFeatureSettings = "tnum")
-                                ) 
+                                )
                             },
                             colors = ListItemDefaults.colors(
                                 containerColor = if (isSelected) Color(0xFF1E293B) else Color.Transparent
                             ),
                             modifier = Modifier.clickable { selectedMedia = item }
                         )
-                        Divider(color = BorderColor)
+                        HorizontalDivider(color = BorderColor)
                     }
                 }
 
@@ -295,7 +382,7 @@ fun MediaScreen() {
                                     color = Color.White
                                 )
                             }
-                            Divider(color = BorderColor)
+                            HorizontalDivider(color = BorderColor)
 
                             Row(modifier = Modifier.fillMaxWidth()) {
                                 Column(modifier = Modifier.weight(1f)) {
@@ -333,7 +420,10 @@ fun MetaField(label: String, value: String, isTabular: Boolean = false) {
 
 @Composable
 fun MediaThumbnail(fileName: String, modifier: Modifier = Modifier) {
-    val isAudio = fileName.endsWith(".wav", ignoreCase = true) || fileName.endsWith(".mp3", ignoreCase = true)
+    val isAudio = fileName.endsWith(".wav", ignoreCase = true) ||
+            fileName.endsWith(".mp3", ignoreCase = true) ||
+            fileName.endsWith(".aac", ignoreCase = true) ||
+            fileName.endsWith(".flac", ignoreCase = true)
     Canvas(
         modifier = modifier
             .size(width = 56.dp, height = 38.dp)
@@ -343,14 +433,12 @@ fun MediaThumbnail(fileName: String, modifier: Modifier = Modifier) {
     ) {
         val w = size.width
         val h = size.height
-        
+
         if (isAudio) {
-            // Draw an audio waveform
             val bars = 6
             val gap = 2.dp.toPx()
             val barW = (w - (bars - 1) * gap) / bars
             for (i in 0 until bars) {
-                // Generate a pseudo-random height based on index
                 val valSin = sin(i * 1.2f)
                 val barH = h * (0.2f + 0.6f * (if (valSin < 0) -valSin else valSin))
                 val x = i * (barW + gap)
@@ -362,8 +450,6 @@ fun MediaThumbnail(fileName: String, modifier: Modifier = Modifier) {
                 )
             }
         } else {
-            // Video / Image: Draw film strip representation
-            // Sweep cinematic gradient background
             drawRect(
                 brush = Brush.linearGradient(
                     colors = listOf(PrimaryAccent.copy(alpha = 0.6f), SecondaryAccent.copy(alpha = 0.6f)),
@@ -371,21 +457,17 @@ fun MediaThumbnail(fileName: String, modifier: Modifier = Modifier) {
                     end = Offset(w, h)
                 )
             )
-            
-            // Sprocket holes on the top and bottom
+
             val sprockets = 5
             val spW = 3.dp.toPx()
             val spH = 2.dp.toPx()
             val spGap = (w - sprockets * spW) / (sprockets + 1)
             for (i in 0 until sprockets) {
                 val x = spGap + i * (spW + spGap)
-                // Top hole
                 drawRect(Color.Black.copy(alpha = 0.7f), Offset(x, 2.dp.toPx()), androidx.compose.ui.geometry.Size(spW, spH))
-                // Bottom hole
                 drawRect(Color.Black.copy(alpha = 0.7f), Offset(x, h - spH - 2.dp.toPx()), androidx.compose.ui.geometry.Size(spW, spH))
             }
-            
-            // Play icon indicator in the center
+
             val path = Path().apply {
                 val cx = w / 2f
                 val cy = h / 2f
@@ -399,4 +481,3 @@ fun MediaThumbnail(fileName: String, modifier: Modifier = Modifier) {
         }
     }
 }
-
