@@ -245,6 +245,7 @@ fun MediaScreen() {
                     items(mediaList) { item ->
                         val isSelected = selectedMedia == item
                         ListItem(
+                            leadingContent = { MediaThumbnail(item.fileName) },
                             headlineContent = { Text(item.fileName, fontWeight = FontWeight.Bold) },
                             supportingContent = { Text(item.filePath, color = TextSecondary, fontSize = 11.sp) },
                             trailingContent = { 
@@ -324,6 +325,75 @@ fun MetaField(label: String, value: String, isTabular: Boolean = false) {
             color = Color.White,
             style = if (isTabular) TextStyle(fontFeatureSettings = "tnum") else TextStyle.Default
         )
+    }
+}
+
+@Composable
+fun MediaThumbnail(fileName: String, modifier: Modifier = Modifier) {
+    val isAudio = fileName.endsWith(".wav", ignoreCase = true) || fileName.endsWith(".mp3", ignoreCase = true)
+    Canvas(
+        modifier = modifier
+            .size(width = 56.dp, height = 38.dp)
+            .clip(RoundedCornerShape(4.dp))
+            .background(Color(0xFF030712))
+            .border(1.dp, BorderColor, RoundedCornerShape(4.dp))
+    ) {
+        val w = size.width
+        val h = size.height
+        
+        if (isAudio) {
+            // Draw an audio waveform
+            val bars = 6
+            val gap = 2.dp.toPx()
+            val barW = (w - (bars - 1) * gap) / bars
+            for (i in 0 until bars) {
+                // Generate a pseudo-random height based on index
+                val valSin = sin(i * 1.2f)
+                val barH = h * (0.2f + 0.6f * (if (valSin < 0) -valSin else valSin))
+                val x = i * (barW + gap)
+                val y = (h - barH) / 2f
+                drawRect(
+                    color = SecondaryAccent,
+                    topLeft = Offset(x, y),
+                    size = androidx.compose.ui.geometry.Size(barW, barH)
+                )
+            }
+        } else {
+            // Video / Image: Draw film strip representation
+            // Sweep cinematic gradient background
+            drawRect(
+                brush = Brush.linearGradient(
+                    colors = listOf(PrimaryAccent.copy(alpha = 0.6f), SecondaryAccent.copy(alpha = 0.6f)),
+                    start = Offset(0f, 0f),
+                    end = Offset(w, h)
+                )
+            )
+            
+            // Sprocket holes on the top and bottom
+            val sprockets = 5
+            val spW = 3.dp.toPx()
+            val spH = 2.dp.toPx()
+            val spGap = (w - sprockets * spW) / (sprockets + 1)
+            for (i in 0 until sprockets) {
+                val x = spGap + i * (spW + spGap)
+                // Top hole
+                drawRect(Color.Black.copy(alpha = 0.7f), Offset(x, 2.dp.toPx()), androidx.compose.ui.geometry.Size(spW, spH))
+                // Bottom hole
+                drawRect(Color.Black.copy(alpha = 0.7f), Offset(x, h - spH - 2.dp.toPx()), androidx.compose.ui.geometry.Size(spW, spH))
+            }
+            
+            // Play icon indicator in the center
+            val path = Path().apply {
+                val cx = w / 2f
+                val cy = h / 2f
+                val size = 6.dp.toPx()
+                moveTo(cx - size / 2f, cy - size)
+                lineTo(cx + size, cy)
+                lineTo(cx - size / 2f, cy + size)
+                close()
+            }
+            drawPath(path, Color.White)
+        }
     }
 }
 

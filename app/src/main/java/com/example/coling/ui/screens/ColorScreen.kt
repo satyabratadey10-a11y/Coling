@@ -479,56 +479,152 @@ fun ColorWheelSection(
     onValueChange: (Offset) -> Unit
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(title, fontWeight = FontWeight.Bold, fontSize = 10.sp, color = Color.White)
-        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = title.uppercase(),
+            fontWeight = FontWeight.Black,
+            fontSize = 9.sp,
+            color = TextSecondary,
+            letterSpacing = 1.sp
+        )
+        Spacer(modifier = Modifier.height(6.dp))
         
-        // Custom interactive grading color circle
-        val radius = 38.dp
+        val radiusDp = 38.dp
         Box(
             modifier = Modifier
-                .size(radius * 2)
+                .size(radiusDp * 2)
                 .clip(CircleShape)
-                .background(
-                    Brush.sweepGradient(
-                        listOf(
-                            Color.Red, Color.Yellow, Color.Green, Color.Cyan, Color.Blue, Color.Magenta, Color.Red
+                .background(DarkSurface)
+                .border(1.dp, BorderColor, CircleShape)
+        ) {
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        detectDragGestures(
+                            onDragStart = { offset ->
+                                val w = size.width.toFloat()
+                                val h = size.height.toFloat()
+                                val cx = w / 2f
+                                val cy = h / 2f
+                                val dx = offset.x - cx
+                                val dy = offset.y - cy
+                                val r = w / 2f
+                                val dist = kotlin.math.sqrt(dx * dx + dy * dy)
+                                val normX = dx / r
+                                val normY = dy / r
+                                if (dist <= r) {
+                                    onValueChange(Offset(normX, normY))
+                                } else {
+                                    onValueChange(Offset(dx / dist, dy / dist))
+                                }
+                            },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                val w = size.width.toFloat()
+                                val h = size.height.toFloat()
+                                val cx = w / 2f
+                                val cy = h / 2f
+                                val touch = change.position
+                                val dx = touch.x - cx
+                                val dy = touch.y - cy
+                                val r = w / 2f
+                                val dist = kotlin.math.sqrt(dx * dx + dy * dy)
+                                if (dist <= r) {
+                                    onValueChange(Offset(dx / r, dy / r))
+                                } else {
+                                    onValueChange(Offset(dx / dist, dy / dist))
+                                }
+                            }
                         )
+                    }
+            ) {
+                val w = size.width.toFloat()
+                val h = size.height.toFloat()
+                val cx = w / 2f
+                val cy = h / 2f
+                val r = w / 2f
+
+                // 1. Draw Sweep Gradient (Full Color Circle)
+                drawCircle(
+                    brush = Brush.sweepGradient(
+                        colors = listOf(
+                            Color.Red, Color.Yellow, Color.Green, Color.Cyan, Color.Blue, Color.Magenta, Color.Red
+                        ),
+                        center = Offset(cx, cy)
                     )
                 )
-                .pointerInput(Unit) {
-                    detectDragGestures { change, dragAmount ->
-                        change.consume()
-                        val rawNew = value + Offset(dragAmount.x / 80f, dragAmount.y / 80f)
-                        val dist = kotlin.math.sqrt(rawNew.x * rawNew.x + rawNew.y * rawNew.y)
-                        if (dist <= 1.0f) {
-                            onValueChange(rawNew)
-                        } else {
-                            onValueChange(Offset(rawNew.x / dist, rawNew.y / dist))
-                        }
-                    }
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize(0.92f)
-                    .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.5f))
-            )
-            // Crosshairs
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                drawLine(Color.White.copy(alpha = 0.2f), Offset(size.width/2, 0f), Offset(size.width/2, size.height), 1f)
-                drawLine(Color.White.copy(alpha = 0.2f), Offset(0f, size.height/2), Offset(size.width, size.height/2), 1f)
+
+                // 2. Draw Radial Gradient Overlay (White desaturation center)
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color.White, Color.Transparent),
+                        center = Offset(cx, cy),
+                        radius = r
+                    )
+                )
+
+                // 3. Draw Axis Guideline Crosshairs (Resolve style)
+                drawLine(
+                    color = Color.Black.copy(alpha = 0.25f),
+                    start = Offset(cx, 0f),
+                    end = Offset(cx, h),
+                    strokeWidth = 2.dp.toPx()
+                )
+                drawLine(
+                    color = Color.Black.copy(alpha = 0.25f),
+                    start = Offset(0f, cy),
+                    end = Offset(w, cy),
+                    strokeWidth = 2.dp.toPx()
+                )
+                
+                drawLine(
+                    color = Color.White.copy(alpha = 0.4f),
+                    start = Offset(cx, 0f),
+                    end = Offset(cx, h),
+                    strokeWidth = 1.dp.toPx()
+                )
+                drawLine(
+                    color = Color.White.copy(alpha = 0.4f),
+                    start = Offset(0f, cy),
+                    end = Offset(w, cy),
+                    strokeWidth = 1.dp.toPx()
+                )
+
+                // Concentric circles for ticks
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.15f),
+                    radius = r * 0.5f,
+                    style = Stroke(1.dp.toPx())
+                )
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.2f),
+                    radius = r,
+                    style = Stroke(1.5.dp.toPx())
+                )
+
+                // 4. Draw Interactive Handle/Selector
+                val sx = cx + value.x * r
+                val sy = cy + value.y * r
+                
+                // Draw handle shadow/outer rim
+                drawCircle(
+                    color = Color.Black.copy(alpha = 0.6f),
+                    radius = 5.dp.toPx(),
+                    center = Offset(sx, sy)
+                )
+                // Draw handle fill
+                drawCircle(
+                    color = Color.White,
+                    radius = 4.dp.toPx(),
+                    center = Offset(sx, sy)
+                )
+                // Center pin point
+                drawCircle(
+                    color = SecondaryAccent,
+                    radius = 1.5.dp.toPx(),
+                    center = Offset(sx, sy)
+                )
             }
-            // Selector
-            Box(
-                modifier = Modifier
-                    .offset(x = (value.x * 28).dp, y = (value.y * 28).dp)
-                    .size(8.dp)
-                    .clip(CircleShape)
-                    .background(Color.White)
-                    .border(1.dp, Color.Black, CircleShape)
-            )
         }
     }
 }
