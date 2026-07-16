@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -69,7 +70,7 @@ fun MainAppScreen() {
                     Text(
                         text = "Native v$nativeVersionString",
                         style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.padding(end = 16.init),
+                        modifier = Modifier.padding(end = 16.dp),
                         color = MaterialTheme.colorScheme.secondary
                     )
                 },
@@ -115,6 +116,3 @@ fun MainAppScreen() {
         }
     }
 }
-
-// Inline extension to avoid compile warnings, resolves to Int
-private val Int.init: Int get() = this
