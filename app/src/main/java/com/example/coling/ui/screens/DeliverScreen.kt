@@ -199,7 +199,7 @@ fun ExportSheetContent(
                     }
                 }
 
-                HorizontalDivider(color = BorderColor)
+                Divider(color = BorderColor)
 
                 // Resolution
                 Column {
@@ -273,7 +273,7 @@ fun ExportSheetContent(
                     }
 
                     LinearProgressIndicator(
-                        progress = { exportProgress },
+                        progress = exportProgress,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(6.dp)

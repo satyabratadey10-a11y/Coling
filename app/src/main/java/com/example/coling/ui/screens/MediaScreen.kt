@@ -350,7 +350,7 @@ fun MediaScreen() {
                             ),
                             modifier = Modifier.clickable { selectedMedia = item }
                         )
-                        HorizontalDivider(color = BorderColor)
+                        Divider(color = BorderColor)
                     }
                 }
 
@@ -382,7 +382,7 @@ fun MediaScreen() {
                                     color = Color.White
                                 )
                             }
-                            HorizontalDivider(color = BorderColor)
+                            Divider(color = BorderColor)
 
                             Row(modifier = Modifier.fillMaxWidth()) {
                                 Column(modifier = Modifier.weight(1f)) {

@@ -329,7 +329,7 @@ fun EditScreen() {
                 drawLine(Color.Red, Offset(playheadX, 0f), Offset(playheadX, size.height), 2.dp.toPx())
             }
 
-            HorizontalDivider(color = BorderColor)
+            Divider(color = BorderColor)
 
             LazyColumn(
                 modifier = Modifier
