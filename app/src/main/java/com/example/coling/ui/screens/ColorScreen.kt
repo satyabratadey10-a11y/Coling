@@ -178,7 +178,7 @@ fun ColorScreen(viewModel: ProjectViewModel) {
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "0${node.id}",
+                                    text = "0${node.id.takeLast(1)}",
                                     fontSize = 9.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = if (isSelected) Color.White else TextSecondary
@@ -198,7 +198,7 @@ fun ColorScreen(viewModel: ProjectViewModel) {
                                     .clip(RoundedCornerShape(2.dp))
                             ) {
                                 val nodeGrad = Brush.horizontalGradient(
-                                    colors = if (node.id == 1) {
+                                    colors = if (node.id == "node1") {
                                         listOf(Color.DarkGray, Color.Gray)
                                     } else {
                                         listOf(Color(0xFF4338CA), Color(0xFFB91C1C), Color(0xFFF59E0B))
