@@ -324,7 +324,7 @@ fun EditScreen(viewModel: ProjectViewModel) {
             ) {
                 Text("Delete", fontSize = 11.sp, color = if (selectedClipId != null) Color.White else TextSecondary)
             }
-        } }
+        }
 
         Spacer(modifier = Modifier.height(10.dp))
 
