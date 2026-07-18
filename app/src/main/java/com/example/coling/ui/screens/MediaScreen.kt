@@ -41,6 +41,9 @@ import com.example.coling.ui.theme.SecondaryAccent
 import com.example.coling.ui.theme.TextSecondary
 import com.example.coling.utils.getFileName
 import com.example.coling.utils.probeMediaFromUri
+import androidx.compose.runtime.collectAsState
+import com.example.coling.data.ProjectViewModel
+import com.example.coling.data.MediaAssetEntity
 import java.io.File
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.BorderStroke
@@ -61,11 +64,11 @@ data class MediaMetadata(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MediaScreen() {
+fun MediaScreen(viewModel: ProjectViewModel) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var mediaList by remember { mutableStateOf(listOf<MediaMetadata>()) }
-    var selectedMedia by remember { mutableStateOf<MediaMetadata?>(null) }
+    val mediaList by viewModel.mediaAssets.collectAsState()
+    var selectedMedia by remember { mutableStateOf<MediaAssetEntity?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     var showAdvancedImport by remember { mutableStateOf(false) }
     var inputPath by remember { mutableStateOf("") }
@@ -91,8 +94,28 @@ fun MediaScreen() {
                     val meta = withContext(Dispatchers.IO) {
                         probeMediaFromUri(context, uri, fileName)
                     }
-                    mediaList = mediaList + meta
-                    selectedMedia = meta
+                    viewModel.importMedia(
+                        fileName = meta.fileName,
+                        filePath = meta.filePath,
+                        format = meta.format,
+                        duration = meta.duration,
+                        size = meta.size,
+                        videoCodec = meta.videoCodec,
+                        audioCodec = meta.audioCodec,
+                        resolution = meta.resolution
+                    )
+                    selectedMedia = MediaAssetEntity(
+                        id = "",
+                        projectId = "",
+                        fileName = meta.fileName,
+                        filePath = meta.filePath,
+                        format = meta.format,
+                        duration = meta.duration,
+                        size = meta.size,
+                        videoCodec = meta.videoCodec,
+                        audioCodec = meta.audioCodec,
+                        resolution = meta.resolution
+                    )
                 }
                 isLoading = false
             }
@@ -221,8 +244,28 @@ fun MediaScreen() {
                                 )
                             }
                             if (meta != null) {
-                                mediaList = mediaList + meta
-                                selectedMedia = meta
+                                viewModel.importMedia(
+                                    fileName = meta.fileName,
+                                    filePath = meta.filePath,
+                                    format = meta.format,
+                                    duration = meta.duration,
+                                    size = meta.size,
+                                    videoCodec = meta.videoCodec,
+                                    audioCodec = meta.audioCodec,
+                                    resolution = meta.resolution
+                                )
+                                selectedMedia = MediaAssetEntity(
+                                    id = "",
+                                    projectId = "",
+                                    fileName = meta.fileName,
+                                    filePath = meta.filePath,
+                                    format = meta.format,
+                                    duration = meta.duration,
+                                    size = meta.size,
+                                    videoCodec = meta.videoCodec,
+                                    audioCodec = meta.audioCodec,
+                                    resolution = meta.resolution
+                                )
                             }
                             isLoading = false
                         }
@@ -326,7 +369,7 @@ fun MediaScreen() {
                         .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
                 ) {
                     items(mediaList) { item ->
-                        val isSelected = selectedMedia == item
+                        val isSelected = selectedMedia?.filePath == item.filePath
                         ListItem(
                             leadingContent = { MediaThumbnail(item.fileName) },
                             headlineContent = { Text(item.fileName, fontWeight = FontWeight.Bold) },
@@ -371,15 +414,36 @@ fun MediaScreen() {
                             verticalArrangement = Arrangement.SpaceBetween
                         ) {
                             Row(
+                                modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Icon(Icons.Default.Info, contentDescription = "Metadata", tint = PrimaryAccent, modifier = Modifier.size(16.dp))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(Icons.Default.Info, contentDescription = "Metadata", tint = PrimaryAccent, modifier = Modifier.size(16.dp))
+                                    Text(
+                                        text = "Clip Metadata Inspector",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
                                 Text(
-                                    text = "Clip Metadata Inspector",
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    text = "Delete",
+                                    color = Color(0xFFEF4444),
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color.White
+                                    modifier = Modifier
+                                        .clickable {
+                                            val realAsset = mediaList.find { it.filePath == media.filePath }
+                                            if (realAsset != null) {
+                                                viewModel.deleteMedia(realAsset.id)
+                                            }
+                                            selectedMedia = null
+                                        }
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
                                 )
                             }
                             Divider(color = BorderColor)

@@ -32,6 +32,8 @@ import com.example.coling.ui.screens.MediaScreen
 import com.example.coling.ui.screens.EditScreen
 import com.example.coling.ui.screens.ColorScreen
 import com.example.coling.ui.screens.ExportSheetContent
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.coling.data.ProjectViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -58,7 +60,7 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainAppScreen() {
+fun MainAppScreen(viewModel: ProjectViewModel = viewModel()) {
     val navController = rememberNavController()
     val items = listOf(Screen.Media, Screen.Edit, Screen.Color)
 
@@ -128,9 +130,9 @@ fun MainAppScreen() {
             startDestination = Screen.Media.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable(Screen.Media.route) { MediaScreen() }
-            composable(Screen.Edit.route) { EditScreen() }
-            composable(Screen.Color.route) { ColorScreen() }
+            composable(Screen.Media.route) { MediaScreen(viewModel) }
+            composable(Screen.Edit.route) { EditScreen(viewModel) }
+            composable(Screen.Color.route) { ColorScreen(viewModel) }
         }
     }
 

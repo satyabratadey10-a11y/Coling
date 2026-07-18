@@ -6,7 +6,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [ProjectEntity::class, TimelineClipEntity::class, ColorNodeEntity::class],
+    entities = [ProjectEntity::class, TimelineClipEntity::class, ColorNodeEntity::class, MediaAssetEntity::class],
     version = 1,
     exportSchema = false
 )
@@ -14,6 +14,7 @@ abstract class ColingDatabase : RoomDatabase() {
     abstract fun projectDao(): ProjectDao
     abstract fun timelineClipDao(): TimelineClipDao
     abstract fun colorNodeDao(): ColorNodeDao
+    abstract fun mediaAssetDao(): MediaAssetDao
 
     companion object {
         @Volatile

@@ -35,6 +35,10 @@ import com.example.coling.ui.theme.DarkSurface
 import com.example.coling.ui.theme.PrimaryAccent
 import com.example.coling.ui.theme.SecondaryAccent
 import com.example.coling.ui.theme.TextSecondary
+import androidx.compose.runtime.collectAsState
+import com.example.coling.data.ProjectViewModel
+import com.example.coling.data.TimelineClipEntity
+import androidx.compose.ui.graphics.toArgb
 
 data class TimelineClip(
     val id: String,
@@ -51,21 +55,36 @@ enum class ClipType {
 
 
 @Composable
-fun EditScreen() {
+fun EditScreen(viewModel: ProjectViewModel) {
     var isPlaying by remember { mutableStateOf(false) }
     var currentFrame by remember { mutableStateOf(120) }
     val totalFrames = 600 // 20 seconds at 30fps
 
-    var clips by remember {
-        mutableStateOf(
-            listOf(
-                TimelineClip("v1", "Intro Sunset.mp4", ClipType.VIDEO, 0, 180, PrimaryAccent.copy(alpha = 0.8f)),
-                TimelineClip("v2", "Landscape Grade.mp4", ClipType.VIDEO, 180, 270, PrimaryAccent),
-                TimelineClip("a1", "Ambient Mix.wav", ClipType.AUDIO, 0, 450, SecondaryAccent),
-                TimelineClip("t1", "VIBRANT SUNSET", ClipType.TITLE, 45, 120, Color(0xFFF59E0B))
-            )
+    val clipsEntity by viewModel.timelineClips.collectAsState()
+    
+    // Map database entity to UI model helper
+    fun TimelineClipEntity.toUIModel(): TimelineClip {
+        val uiType = when (type) {
+            "VIDEO" -> ClipType.VIDEO
+            "AUDIO" -> ClipType.AUDIO
+            else -> ClipType.TITLE
+        }
+        val uiColor = try {
+            Color(android.graphics.Color.parseColor(colorHex))
+        } catch (_: Exception) {
+            PrimaryAccent
+        }
+        return TimelineClip(
+            id = id,
+            name = name,
+            type = uiType,
+            startFrame = startFrame,
+            durationFrames = durationFrames,
+            color = uiColor
         )
     }
+
+    val clips = remember(clipsEntity) { clipsEntity.map { it.toUIModel() } }
 
     var selectedClipId by remember { mutableStateOf<String?>("v2") }
 
@@ -216,7 +235,7 @@ fun EditScreen() {
         // 3. Edit Action Bar
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Button(
                 onClick = {
@@ -225,18 +244,14 @@ fun EditScreen() {
                         val playheadOffset = currentFrame - selected.startFrame
                         if (playheadOffset > 10 && playheadOffset < selected.durationFrames - 10) {
                             val newDuration = selected.durationFrames - playheadOffset
-                            selected.durationFrames = playheadOffset
-
-                            val splitClip = TimelineClip(
-                                id = selected.id + "_split",
-                                name = selected.name.replace(".mp4", "") + "\u00A0(Part\u00A02)",
-                                type = selected.type,
-                                startFrame = currentFrame,
+                            viewModel.updateClipPosition(selected.id, selected.startFrame, playheadOffset)
+                            val colorHex = "#" + Integer.toHexString(selected.color.toArgb()).substring(2)
+                            viewModel.addClipToTimeline(
+                                name = selected.name.replace(".mp4", "") + " (Part 2)",
+                                type = selected.type.name,
                                 durationFrames = newDuration,
-                                color = selected.color
+                                colorHex = colorHex
                             )
-                            clips = clips + splitClip
-                            selectedClipId = splitClip.id
                         }
                     }
                 },
@@ -246,19 +261,18 @@ fun EditScreen() {
                     containerColor = Color(0xFF1E293B),
                     disabledContainerColor = Color(0xFF0F172A)
                 ),
-                shape = RoundedCornerShape(6.dp)
+                shape = RoundedCornerShape(6.dp),
+                contentPadding = PaddingValues(horizontal = 4.dp)
             ) {
-                Text("Split", fontSize = 12.sp, color = if (selectedClipId != null) Color.White else TextSecondary)
+                Text("Split", fontSize = 11.sp, color = if (selectedClipId != null) Color.White else TextSecondary)
             }
-
+ 
             Button(
                 onClick = {
                     val selected = clips.find { it.id == selectedClipId }
                     if (selected != null && currentFrame > selected.startFrame && currentFrame < selected.startFrame + selected.durationFrames) {
                         val diff = currentFrame - selected.startFrame
-                        selected.startFrame = currentFrame
-                        selected.durationFrames -= diff
-                        clips = clips.toList()
+                        viewModel.updateClipPosition(selected.id, currentFrame, selected.durationFrames - diff)
                     }
                 },
                 enabled = selectedClipId != null,
@@ -267,17 +281,17 @@ fun EditScreen() {
                     containerColor = Color(0xFF1E293B),
                     disabledContainerColor = Color(0xFF0F172A)
                 ),
-                shape = RoundedCornerShape(6.dp)
+                shape = RoundedCornerShape(6.dp),
+                contentPadding = PaddingValues(horizontal = 4.dp)
             ) {
-                Text("Trim In", fontSize = 12.sp, color = if (selectedClipId != null) Color.White else TextSecondary)
+                Text("Trim In", fontSize = 11.sp, color = if (selectedClipId != null) Color.White else TextSecondary)
             }
-
+ 
             Button(
                 onClick = {
                     val selected = clips.find { it.id == selectedClipId }
                     if (selected != null && currentFrame > selected.startFrame && currentFrame < selected.startFrame + selected.durationFrames) {
-                        selected.durationFrames = currentFrame - selected.startFrame
-                        clips = clips.toList()
+                        viewModel.updateClipPosition(selected.id, selected.startFrame, currentFrame - selected.startFrame)
                     }
                 },
                 enabled = selectedClipId != null,
@@ -286,11 +300,31 @@ fun EditScreen() {
                     containerColor = Color(0xFF1E293B),
                     disabledContainerColor = Color(0xFF0F172A)
                 ),
-                shape = RoundedCornerShape(6.dp)
+                shape = RoundedCornerShape(6.dp),
+                contentPadding = PaddingValues(horizontal = 4.dp)
             ) {
-                Text("Trim Out", fontSize = 12.sp, color = if (selectedClipId != null) Color.White else TextSecondary)
+                Text("Trim Out", fontSize = 11.sp, color = if (selectedClipId != null) Color.White else TextSecondary)
             }
-        }
+
+            Button(
+                onClick = {
+                    selectedClipId?.let { clipId ->
+                        viewModel.deleteClipFromTimeline(clipId)
+                        selectedClipId = null
+                    }
+                },
+                enabled = selectedClipId != null,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFEF4444).copy(alpha = 0.8f),
+                    disabledContainerColor = Color(0xFF0F172A)
+                ),
+                shape = RoundedCornerShape(6.dp),
+                contentPadding = PaddingValues(horizontal = 4.dp)
+            ) {
+                Text("Delete", fontSize = 11.sp, color = if (selectedClipId != null) Color.White else TextSecondary)
+            }
+        } }
 
         Spacer(modifier = Modifier.height(10.dp))
 

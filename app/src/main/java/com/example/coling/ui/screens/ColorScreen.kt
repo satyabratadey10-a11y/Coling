@@ -33,9 +33,12 @@ import kotlin.math.cos
 import kotlin.math.sin
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.RangeSlider
+import androidx.compose.runtime.collectAsState
+import com.example.coling.data.ProjectViewModel
+import com.example.coling.data.ColorNodeEntity
 
 data class ColorNode(
-    val id: Int,
+    val id: String,
     val name: String,
     var type: NodeType,
     var isEnabled: Boolean = true
@@ -47,7 +50,7 @@ enum class NodeType {
 
 
 @Composable
-fun ColorScreen() {
+fun ColorScreen(viewModel: ProjectViewModel) {
     var liftVal by remember { mutableStateOf(Offset(0f, 0f)) }
     var gammaVal by remember { mutableStateOf(Offset(0f, 0f)) }
     var gainVal by remember { mutableStateOf(Offset(0f, 0f)) }
@@ -58,17 +61,41 @@ fun ColorScreen() {
     var contrastGrade by remember { mutableStateOf(1.0f) } // 0.5 to 2.0
     var saturationGrade by remember { mutableStateOf(1.0f) }
 
-    var nodes by remember {
-        mutableStateOf(
-            listOf(
-                ColorNode(1, "Input Log", NodeType.SERIAL),
-                ColorNode(2, "Base Grade", NodeType.SERIAL),
-                ColorNode(3, "Secondary Sat", NodeType.PARALLEL),
-                ColorNode(4, "Vignette Mask", NodeType.SERIAL)
+    val colorNodesEntity by viewModel.colorNodes.collectAsState()
+    
+    val nodes = remember(colorNodesEntity) {
+        colorNodesEntity.map { entity ->
+            ColorNode(
+                id = entity.id,
+                name = entity.name,
+                type = when (entity.type) {
+                    "SERIAL" -> NodeType.SERIAL
+                    else -> NodeType.PARALLEL
+                },
+                isEnabled = entity.isEnabled
             )
-        )
+        }
     }
-    var selectedNodeId by remember { mutableStateOf(2) }
+
+    var selectedNodeId by remember { mutableStateOf("") }
+    
+    LaunchedEffect(nodes) {
+        if (selectedNodeId.isEmpty() && nodes.isNotEmpty()) {
+            selectedNodeId = nodes.first().id
+        }
+    }
+
+    val selectedNode = remember(colorNodesEntity, selectedNodeId) {
+        colorNodesEntity.find { it.id == selectedNodeId }
+    }
+
+    LaunchedEffect(selectedNode) {
+        selectedNode?.let {
+            liftVal = Offset(it.liftX, it.liftY)
+            gammaVal = Offset(it.gammaX, it.gammaY)
+            gainVal = Offset(it.gainX, it.gainY)
+        }
+    }
     
     // UI selections
     var activeTab by remember { mutableStateOf("Wheels") } 
@@ -238,9 +265,24 @@ fun ColorScreen() {
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceEvenly
                         ) {
-                            ColorWheelSection("Lift", liftVal) { liftVal = it }
-                            ColorWheelSection("Gamma", gammaVal) { gammaVal = it }
-                            ColorWheelSection("Gain", gainVal) { gainVal = it }
+                            ColorWheelSection("Lift", liftVal) { 
+                                liftVal = it 
+                                selectedNode?.let { node ->
+                                    viewModel.updateColorNodeOffset(node.id, it.x, it.y, gammaVal.x, gammaVal.y, gainVal.x, gainVal.y)
+                                }
+                            }
+                            ColorWheelSection("Gamma", gammaVal) { 
+                                gammaVal = it 
+                                selectedNode?.let { node ->
+                                    viewModel.updateColorNodeOffset(node.id, liftVal.x, liftVal.y, it.x, it.y, gainVal.x, gainVal.y)
+                                }
+                            }
+                            ColorWheelSection("Gain", gainVal) { 
+                                gainVal = it 
+                                selectedNode?.let { node ->
+                                    viewModel.updateColorNodeOffset(node.id, liftVal.x, liftVal.y, gammaVal.x, gammaVal.y, it.x, it.y)
+                                }
+                            }
                         }
 
                         Divider(color = BorderColor, modifier = Modifier.padding(vertical = 4.dp))

@@ -61,6 +61,30 @@ data class ColorNodeEntity(
     val gainY: Float
 )
 
+@Entity(
+    tableName = "media_assets",
+    foreignKeys = [
+        ForeignKey(
+            entity = ProjectEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["projectId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ]
+)
+data class MediaAssetEntity(
+    @PrimaryKey val id: String,
+    val projectId: String,
+    val fileName: String,
+    val filePath: String,
+    val format: String,
+    val duration: String,
+    val size: String,
+    val videoCodec: String,
+    val audioCodec: String,
+    val resolution: String
+)
+
 @Dao
 interface ProjectDao {
     @Query("SELECT * FROM projects ORDER BY lastModifiedTime DESC")
@@ -80,6 +104,9 @@ interface TimelineClipDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertClips(clips: List<TimelineClipEntity>)
+
+    @Query("DELETE FROM timeline_clips WHERE id = :clipId")
+    suspend fun deleteClip(clipId: String)
 }
 
 @Dao
@@ -90,3 +117,16 @@ interface ColorNodeDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertNodes(nodes: List<ColorNodeEntity>)
 }
+
+@Dao
+interface MediaAssetDao {
+    @Query("SELECT * FROM media_assets WHERE projectId = :projectId")
+    suspend fun getAssetsForProject(projectId: String): List<MediaAssetEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAsset(asset: MediaAssetEntity)
+
+    @Query("DELETE FROM media_assets WHERE id = :assetId")
+    suspend fun deleteAsset(assetId: String)
+}
+
