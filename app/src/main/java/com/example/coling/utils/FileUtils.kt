@@ -7,6 +7,7 @@ import android.media.MediaMetadataRetriever
 import android.graphics.Bitmap
 import android.os.ParcelFileDescriptor
 import com.example.coling.ui.screens.MediaMetadata
+import com.arthenica.ffmpegkit.FFprobeKit
 
 /**
  * Extract display file name from a content:// Uri.
@@ -60,8 +61,6 @@ fun openPfd(context: Context, uri: Uri): ParcelFileDescriptor? {
         null
     }
 }
-
-import com.arthenica.ffmpegkit.FFprobeKit
 
 /**
  * Probe media metadata from a content:// Uri using FFprobe via a ParcelFileDescriptor pipe,
