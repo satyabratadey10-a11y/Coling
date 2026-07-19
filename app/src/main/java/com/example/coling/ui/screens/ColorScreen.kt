@@ -166,7 +166,7 @@ fun ColorScreen(viewModel: ProjectViewModel) {
 
                 nodes.forEachIndexed { i, node ->
                     val isSelected = node.id == selectedNodeId
-                    val nodeLeft = 16.dp + i * 150.dp // 120.dp width + 30.dp gap
+                    val nodeLeft = 16.dp + 150.dp * i // 120.dp width + 30.dp gap
 
                     Box(
                         modifier = Modifier

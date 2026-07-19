@@ -561,7 +561,7 @@ fun createProceduralSunset(width: Int, height: Int): Bitmap {
     canvas.drawCircle(width / 2f, height * 0.6f, height * 0.3f, paint)
 
     // Draw horizontal scanlines/grid lines for the retro aesthetic
-    paint.color = android.graphics.Color.BLACK.copy(alpha = 0.2f)
+    paint.color = android.graphics.Color.argb(51, 0, 0, 0)
     paint.strokeWidth = 2f
     for (y in (height * 0.6f).toInt()..height step 12) {
         canvas.drawLine(0f, y.toFloat(), width.toFloat(), y.toFloat(), paint)
