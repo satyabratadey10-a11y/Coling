@@ -45,6 +45,7 @@ import com.example.coling.utils.extractThumbnail
 import com.example.coling.NativeBridge
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.Image
 import androidx.compose.ui.platform.LocalContext
@@ -68,6 +69,20 @@ fun EditScreen(viewModel: ProjectViewModel) {
     var isPlaying by remember { mutableStateOf(false) }
     var currentFrame by remember { mutableStateOf(120) }
     val totalFrames = 600 // 20 seconds at 30fps
+
+    LaunchedEffect(isPlaying) {
+        if (isPlaying) {
+            while (isPlaying) {
+                delay(33)
+                if (currentFrame < totalFrames) {
+                    currentFrame++
+                } else {
+                    currentFrame = 0
+                    isPlaying = false
+                }
+            }
+        }
+    }
 
     val clipsEntity by viewModel.timelineClips.collectAsState()
     

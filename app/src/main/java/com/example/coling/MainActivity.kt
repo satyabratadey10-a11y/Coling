@@ -144,6 +144,7 @@ fun MainAppScreen(viewModel: ProjectViewModel = viewModel()) {
             tonalElevation = 8.dp
         ) {
             ExportSheetContent(
+                viewModel = viewModel,
                 onDismiss = { showExportSheet = false },
                 onExportStarted = { running -> isExportRunning = running }
             )
