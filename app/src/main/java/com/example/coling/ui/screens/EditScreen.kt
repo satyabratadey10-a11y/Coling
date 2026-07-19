@@ -39,6 +39,15 @@ import androidx.compose.runtime.collectAsState
 import com.example.coling.data.ProjectViewModel
 import com.example.coling.data.TimelineClipEntity
 import androidx.compose.ui.graphics.toArgb
+import android.graphics.Bitmap
+import android.net.Uri
+import com.example.coling.utils.extractThumbnail
+import com.example.coling.NativeBridge
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.foundation.Image
+import androidx.compose.ui.platform.LocalContext
 
 data class TimelineClip(
     val id: String,
@@ -88,6 +97,67 @@ fun EditScreen(viewModel: ProjectViewModel) {
 
     var selectedClipId by remember { mutableStateOf<String?>("v2") }
 
+    val context = LocalContext.current
+    val mediaList by viewModel.mediaAssets.collectAsState()
+    val colorNodes by viewModel.colorNodes.collectAsState()
+    val primariesNode = remember(colorNodes) { colorNodes.find { it.id == "node1" } }
+
+    val activeVideoClip = remember(clips, currentFrame) {
+        clips.firstOrNull {
+            it.type == ClipType.VIDEO &&
+            currentFrame >= it.startFrame &&
+            currentFrame < (it.startFrame + it.durationFrames)
+        }
+    }
+
+    var previewBitmap by remember { mutableStateOf<Bitmap?>(null) }
+
+    LaunchedEffect(currentFrame, activeVideoClip, mediaList, primariesNode) {
+        withContext(Dispatchers.IO) {
+            val baseBitmap = if (activeVideoClip != null) {
+                val matchingAsset = mediaList.find { it.fileName == activeVideoClip.name }
+                if (matchingAsset != null) {
+                    val clipLocalFrame = currentFrame - activeVideoClip.startFrame
+                    val timeUs = (clipLocalFrame.toFloat() / 30f * 1_000_000f).toLong()
+                    extractThumbnail(context, Uri.parse(matchingAsset.filePath), timeUs)
+                        ?: createProceduralSunset(400, 225)
+                } else {
+                    createProceduralSunset(400, 225)
+                }
+            } else {
+                createProceduralSunset(400, 225)
+            }
+
+            val mutableBitmap = baseBitmap.copy(Bitmap.Config.ARGB_8888, true)
+
+            if (primariesNode != null) {
+                val liftR = primariesNode.liftX * 0.2f
+                val liftG = primariesNode.liftY * 0.2f
+                val liftB = - (primariesNode.liftX + primariesNode.liftY) * 0.1f
+
+                val gammaR = 1.0f + primariesNode.gammaX * 0.5f
+                val gammaG = 1.0f + primariesNode.gammaY * 0.5f
+                val gammaB = 1.0f - (primariesNode.gammaX + primariesNode.gammaY) * 0.25f
+
+                val gainR = 1.0f + primariesNode.gainX * 0.5f
+                val gainG = 1.0f + primariesNode.gainY * 0.5f
+                val gainB = 1.0f - (primariesNode.gainX + primariesNode.gainY) * 0.25f
+
+                NativeBridge.processBitmap(
+                    mutableBitmap,
+                    liftR = liftR, liftG = liftG, liftB = liftB,
+                    gammaR = gammaR, gammaG = gammaG, gammaB = gammaB,
+                    gainR = gainR, gainG = gainG, gainB = gainB,
+                    contrast = 1.0f, saturation = 1.0f
+                )
+            }
+
+            withContext(Dispatchers.Main) {
+                previewBitmap = mutableBitmap
+            }
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -104,15 +174,23 @@ fun EditScreen(viewModel: ProjectViewModel) {
             contentAlignment = Alignment.Center
         ) {
             // Real preview placeholder — will show actual frames when native pipeline is wired
-            Box(
-                modifier = Modifier.fillMaxSize().background(Color.Black),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "Preview (static frame)",
-                    color = TextSecondary,
-                    fontSize = 12.sp
+            if (previewBitmap != null) {
+                Image(
+                    bitmap = previewBitmap!!.asImageBitmap(),
+                    contentDescription = "Video Preview",
+                    modifier = Modifier.fillMaxSize()
                 )
+            } else {
+                Box(
+                    modifier = Modifier.fillMaxSize().background(Color.Black),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Loading Frame...",
+                        color = TextSecondary,
+                        fontSize = 12.sp
+                    )
+                }
             }
 
             // Safe zone grid overlay (real feature, keep it)
@@ -460,4 +538,34 @@ fun EditScreen(viewModel: ProjectViewModel) {
             }
         }
     }
+}
+
+fun createProceduralSunset(width: Int, height: Int): Bitmap {
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(bitmap)
+    val paint = android.graphics.Paint()
+
+    // sunset linear gradient background
+    val shader = android.graphics.LinearGradient(
+        0f, 0f, 0f, height.toFloat(),
+        android.graphics.Color.parseColor("#1F1C2C"), // Dark Indigo
+        android.graphics.Color.parseColor("#928DAB"), // Soft Lavender
+        android.graphics.Shader.TileMode.CLAMP
+    )
+    paint.shader = shader
+    canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+
+    // Draw a big warm sun in the middle
+    paint.shader = null
+    paint.color = android.graphics.Color.parseColor("#FF4E50")
+    canvas.drawCircle(width / 2f, height * 0.6f, height * 0.3f, paint)
+
+    // Draw horizontal scanlines/grid lines for the retro aesthetic
+    paint.color = android.graphics.Color.BLACK.copy(alpha = 0.2f)
+    paint.strokeWidth = 2f
+    for (y in (height * 0.6f).toInt()..height step 12) {
+        canvas.drawLine(0f, y.toFloat(), width.toFloat(), y.toFloat(), paint)
+    }
+
+    return bitmap
 }

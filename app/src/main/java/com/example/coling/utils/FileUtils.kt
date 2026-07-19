@@ -61,11 +61,55 @@ fun openPfd(context: Context, uri: Uri): ParcelFileDescriptor? {
     }
 }
 
+import com.arthenica.ffmpegkit.FFprobeKit
+
 /**
- * Probe media metadata from a content:// Uri using MediaMetadataRetriever.
- * Falls back to basic info if metadata extraction fails.
+ * Probe media metadata from a content:// Uri using FFprobe via a ParcelFileDescriptor pipe,
+ * falling back to MediaMetadataRetriever on error.
  */
 fun probeMediaFromUri(context: Context, uri: Uri, fileName: String): MediaMetadata {
+    var pfd: ParcelFileDescriptor? = null
+    return try {
+        pfd = context.contentResolver.openFileDescriptor(uri, "r")
+        if (pfd == null) throw Exception("Failed to open ParcelFileDescriptor")
+        val fd = pfd.fd
+        val pipePath = "pipe:$fd"
+
+        val session = FFprobeKit.getMediaInformation(pipePath)
+        val info = session.mediaInformation
+        if (info != null) {
+            val videoStream = info.streams.firstOrNull { it.type == "video" }
+            val audioStream = info.streams.firstOrNull { it.type == "audio" }
+
+            val durationMs = info.duration?.toDoubleOrNull() ?: 0.0
+            val durationStr = if (durationMs > 0.0) "${"%.2f".format(durationMs)}s" else "N/A"
+
+            val fileSize = getFileSize(context, uri)
+            val sizeStr = if (fileSize > 0) "${"%.1f".format(fileSize / (1024.0 * 1024.0))}\u00A0MB" else "N/A"
+
+            val resolution = if (videoStream != null) "${videoStream.width}x${videoStream.height}" else "N/A"
+
+            MediaMetadata(
+                fileName = fileName,
+                filePath = uri.toString(),
+                format = info.format ?: "unknown",
+                duration = durationStr,
+                size = sizeStr,
+                videoCodec = videoStream?.codec ?: "none",
+                audioCodec = audioStream?.codec ?: "none",
+                resolution = resolution
+            )
+        } else {
+            throw Exception("Failed to get media info from FFprobe")
+        }
+    } catch (e: Exception) {
+        probeMediaFallback(context, uri, fileName)
+    } finally {
+        try { pfd?.close() } catch (_: Exception) {}
+    }
+}
+
+private fun probeMediaFallback(context: Context, uri: Uri, fileName: String): MediaMetadata {
     val retriever = MediaMetadataRetriever()
     return try {
         retriever.setDataSource(context, uri)
@@ -78,9 +122,6 @@ fun probeMediaFromUri(context: Context, uri: Uri, fileName: String): MediaMetada
         val resolution = if (width != "0" && height != "0") "${width}x${height}" else "N/A"
 
         val mimeType = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_MIMETYPE) ?: "unknown"
-        val bitrate = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITRATE)
-            ?.toLongOrNull()?.let { "${"%.1f".format(it / (1024.0 * 1024.0))}\u00A0Mbps" } ?: "N/A"
-
         val fileSize = getFileSize(context, uri)
         val sizeStr = if (fileSize > 0) "${"%.1f".format(fileSize / (1024.0 * 1024.0))}\u00A0MB" else "N/A"
 
@@ -91,7 +132,7 @@ fun probeMediaFromUri(context: Context, uri: Uri, fileName: String): MediaMetada
             duration = duration,
             size = sizeStr,
             videoCodec = mimeType.substringAfter("/", "unknown"),
-            audioCodec = "aac", // MediaMetadataRetriever doesn't expose audio codec name directly
+            audioCodec = "unknown",
             resolution = resolution
         )
     } catch (e: Exception) {

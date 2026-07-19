@@ -430,21 +430,44 @@ fun MediaScreen(viewModel: ProjectViewModel) {
                                         color = Color.White
                                     )
                                 }
-                                Text(
-                                    text = "Delete",
-                                    color = Color(0xFFEF4444),
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier
-                                        .clickable {
-                                            val realAsset = mediaList.find { it.filePath == media.filePath }
-                                            if (realAsset != null) {
-                                                viewModel.deleteMedia(realAsset.id)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        text = "Add to Timeline",
+                                        color = PrimaryAccent,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier
+                                            .clickable {
+                                                val isAudio = media.fileName.endsWith(".wav", ignoreCase = true) ||
+                                                        media.fileName.endsWith(".mp3", ignoreCase = true)
+                                                viewModel.addClipToTimeline(
+                                                    name = media.fileName,
+                                                    type = if (isAudio) "AUDIO" else "VIDEO",
+                                                    durationFrames = 150,
+                                                    colorHex = if (isAudio) "#10B981" else "#38BDF8"
+                                                )
                                             }
-                                            selectedMedia = null
-                                        }
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                    Text(
+                                        text = "Delete",
+                                        color = Color(0xFFEF4444),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier
+                                            .clickable {
+                                                val realAsset = mediaList.find { it.filePath == media.filePath }
+                                                if (realAsset != null) {
+                                                    viewModel.deleteMedia(realAsset.id)
+                                                }
+                                                selectedMedia = null
+                                            }
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
                             }
                             Divider(color = BorderColor)
 

@@ -12,6 +12,7 @@ find_library(log-lib log)
 # Find OpenGL ES 3.x and EGL
 find_library(gles-lib GLESv3)
 find_library(egl-lib EGL)
+find_library(graphics-lib jnigraphics)
 
 # Source files
 set(SOURCE_FILES
@@ -33,4 +34,5 @@ target_link_libraries(coling_native
     ${log-lib}
     ${gles-lib}
     ${egl-lib}
+    ${graphics-lib}
 )

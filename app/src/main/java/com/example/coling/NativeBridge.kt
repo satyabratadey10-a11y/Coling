@@ -30,4 +30,15 @@ object NativeBridge {
      * Passes a serialized JSON string containing node graph parameters.
      */
     external fun processFrame(inputTexId: Int, outputTexId: Int, nodeGraphJson: String): Boolean
+
+    /**
+     * Process a Bitmap in-place with Lift, Gamma, Gain, Contrast, and Saturation settings.
+     */
+    external fun processBitmap(
+        bitmap: Any,
+        liftR: Float, liftG: Float, liftB: Float,
+        gammaR: Float, gammaG: Float, gammaB: Float,
+        gainR: Float, gainG: Float, gainB: Float,
+        contrast: Float, saturation: Float
+    ): Boolean
 }

@@ -36,6 +36,8 @@ import androidx.compose.material3.RangeSlider
 import androidx.compose.runtime.collectAsState
 import com.example.coling.data.ProjectViewModel
 import com.example.coling.data.ColorNodeEntity
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.ui.graphics.graphicsLayer
 
 data class ColorNode(
     val id: String,
@@ -96,6 +98,9 @@ fun ColorScreen(viewModel: ProjectViewModel) {
             gainVal = Offset(it.gainX, it.gainY)
         }
     }
+
+    var scale by remember { mutableStateOf(1.0f) }
+    var panOffset by remember { mutableStateOf(Offset.Zero) }
     
     // UI selections
     var activeTab by remember { mutableStateOf("Wheels") } 
@@ -123,97 +128,108 @@ fun ColorScreen(viewModel: ProjectViewModel) {
                 .clip(RoundedCornerShape(8.dp))
                 .background(Color(0xFF070B13))
                 .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
-        ) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val nodeW = 120.dp.toPx()
-                val gap = 30.dp.toPx()
-                val startX = 16.dp.toPx()
-                val y = size.height / 2
-
-                for (i in 0 until nodes.size - 1) {
-                    val x1 = startX + (i * (nodeW + gap)) + nodeW
-                    val x2 = startX + ((i + 1) * (nodeW + gap))
-
-                    // Draw flow wire
-                    val flowPath = Path().apply {
-                        moveTo(x1, y)
-                        cubicTo(x1 + gap/2, y, x2 - gap/2, y, x2, y)
+                .pointerInput(Unit) {
+                    detectTransformGestures { _, pan, zoom, _ ->
+                        scale = (scale * zoom).coerceIn(0.5f, 2.0f)
+                        panOffset += pan
                     }
-                    drawPath(flowPath, SecondaryAccent.copy(alpha = 0.5f), style = Stroke(width = 2.dp.toPx()))
-
-                    // Draw connection sockets
-                    drawCircle(Color.Green, 3.dp.toPx(), Offset(x1, y))
-                    drawCircle(Color.Green, 3.dp.toPx(), Offset(x2, y))
                 }
-            }
-
-            LazyRow(
+        ) {
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(30.dp)
+                    .graphicsLayer(
+                        scaleX = scale,
+                        scaleY = scale,
+                        translationX = panOffset.x,
+                        translationY = panOffset.y
+                    )
             ) {
-                items(nodes) { node ->
-                    val isSelected = node.id == selectedNodeId
-                    Card(
-                        modifier = Modifier
-                            .width(120.dp)
-                            .height(95.dp)
-                            .clickable { selectedNodeId = node.id },
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (isSelected) Color(0xFF1E293B) else DarkSurface
-                        ),
-                        border = BorderStroke(1.dp, if (isSelected) Color.White else BorderColor)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(6.dp),
-                            verticalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "0${node.id.takeLast(1)}",
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isSelected) Color.White else TextSecondary
-                                )
-                                Box(
-                                    modifier = Modifier
-                                        .size(6.dp)
-                                        .background(if (node.isEnabled) Color.Green else Color.Red, CircleShape)
-                                )
-                            }
-                            
-                            // Visual grade thumbnail inside node card
-                            Canvas(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(35.dp)
-                                    .clip(RoundedCornerShape(2.dp))
-                            ) {
-                                val nodeGrad = Brush.horizontalGradient(
-                                    colors = if (node.id == "node1") {
-                                        listOf(Color.DarkGray, Color.Gray)
-                                    } else {
-                                        listOf(Color(0xFF4338CA), Color(0xFFB91C1C), Color(0xFFF59E0B))
-                                    }
-                                )
-                                drawRect(nodeGrad)
-                            }
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val nodeW = 120.dp.toPx()
+                    val nodeH = 95.dp.toPx()
+                    val y = size.height / 2
 
-                            Text(
-                                text = node.name,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color.White,
-                                maxLines = 1
-                            )
+                    for (i in 0 until nodes.size - 1) {
+                        val x1 = 16.dp.toPx() + (i * (nodeW + 30.dp.toPx())) + nodeW
+                        val x2 = 16.dp.toPx() + ((i + 1) * (nodeW + 30.dp.toPx()))
+
+                        val flowPath = Path().apply {
+                            moveTo(x1, y)
+                            cubicTo(x1 + 15.dp.toPx(), y, x2 - 15.dp.toPx(), y, x2, y)
+                        }
+                        drawPath(flowPath, SecondaryAccent.copy(alpha = 0.5f), style = Stroke(width = 2.dp.toPx()))
+                        drawCircle(Color.Green, 3.dp.toPx(), Offset(x1, y))
+                        drawCircle(Color.Green, 3.dp.toPx(), Offset(x2, y))
+                    }
+                }
+
+                nodes.forEachIndexed { i, node ->
+                    val isSelected = node.id == selectedNodeId
+                    val nodeLeft = 16.dp + i * 150.dp // 120.dp width + 30.dp gap
+
+                    Box(
+                        modifier = Modifier
+                            .offset(x = nodeLeft, y = 10.dp)
+                    ) {
+                        Card(
+                            modifier = Modifier
+                                .width(120.dp)
+                                .height(95.dp)
+                                .clickable { selectedNodeId = node.id },
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isSelected) Color(0xFF1E293B) else DarkSurface
+                            ),
+                            border = BorderStroke(1.dp, if (isSelected) Color.White else BorderColor)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(6.dp),
+                                verticalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "0${node.id.takeLast(1)}",
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isSelected) Color.White else TextSecondary
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(6.dp)
+                                            .background(if (node.isEnabled) Color.Green else Color.Red, CircleShape)
+                                    )
+                                }
+
+                                Canvas(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(35.dp)
+                                        .clip(RoundedCornerShape(2.dp))
+                                ) {
+                                    val nodeGrad = Brush.horizontalGradient(
+                                        colors = if (node.id == "node1") {
+                                            listOf(Color.DarkGray, Color.Gray)
+                                        } else {
+                                            listOf(Color(0xFF4338CA), Color(0xFFB91C1C), Color(0xFFF59E0B))
+                                        }
+                                    )
+                                    drawRect(nodeGrad)
+                                }
+
+                                Text(
+                                    text = node.name,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color.White,
+                                    maxLines = 1
+                                )
+                            }
                         }
                     }
                 }
