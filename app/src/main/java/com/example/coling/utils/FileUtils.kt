@@ -8,6 +8,7 @@ import android.graphics.Bitmap
 import android.os.ParcelFileDescriptor
 import com.example.coling.ui.screens.MediaMetadata
 import com.arthenica.ffmpegkit.FFprobeKit
+import java.io.File
 
 /**
  * Extract display file name from a content:// Uri.
@@ -156,12 +157,35 @@ private fun probeMediaFallback(context: Context, uri: Uri, fileName: String): Me
  */
 fun extractThumbnail(context: Context, uri: Uri, timeUs: Long = 0): Bitmap? {
     val retriever = MediaMetadataRetriever()
+    var pfd: ParcelFileDescriptor? = null
     return try {
-        retriever.setDataSource(context, uri)
+        if (uri.scheme == "content") {
+            pfd = context.contentResolver.openFileDescriptor(uri, "r")
+            if (pfd != null) {
+                retriever.setDataSource(pfd.fileDescriptor)
+            } else {
+                retriever.setDataSource(context, uri)
+            }
+        } else {
+            val path = uri.path
+            if (path != null && File(path).exists()) {
+                retriever.setDataSource(path)
+            } else if (uri.toString().startsWith("/")) {
+                val directFile = File(uri.toString())
+                if (directFile.exists()) {
+                    retriever.setDataSource(directFile.absolutePath)
+                } else {
+                    retriever.setDataSource(context, uri)
+                }
+            } else {
+                retriever.setDataSource(context, uri)
+            }
+        }
         retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
     } catch (e: Exception) {
         null
     } finally {
+        try { pfd?.close() } catch (_: Exception) {}
         try { retriever.release() } catch (_: Exception) {}
     }
 }

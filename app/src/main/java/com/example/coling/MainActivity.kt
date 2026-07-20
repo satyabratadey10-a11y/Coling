@@ -86,11 +86,13 @@ fun MainAppScreen(viewModel: ProjectViewModel = viewModel()) {
                         )
                     }
                     // Export action button
-                    IconButton(onClick = { showExportSheet = true }) {
-                        Icon(
-                            Icons.Default.PlayArrow,
-                            contentDescription = "Export project",
-                            tint = MaterialTheme.colorScheme.primary
+                    Button(
+                        onClick = { showExportSheet = true },
+                        modifier = Modifier.padding(end = 8.dp)
+                    ) {
+                        Text(
+                            text = "EXPORT",
+                            style = MaterialTheme.typography.labelLarge
                         )
                     }
                 },
