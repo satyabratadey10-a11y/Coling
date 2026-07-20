@@ -73,10 +73,17 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             val defaultNodes = listOf(
                 ColorNodeEntity("node1", projectId, 0, "Primaries (CDL)", "SERIAL", true, 0f, 0f, 0f, 0f, 0f, 0f),
                 ColorNodeEntity("node2", projectId, 1, "Curves", "SERIAL", true, 0f, 0f, 0f, 0f, 0f, 0f),
-                ColorNodeEntity("node3", projectId, 2, "Secondary Sat", "SERIAL", false, 0f, 0f, 0f, 0f, 0f, 0f)
+                ColorNodeEntity("node3", projectId, 2, "Custom LUT", "SERIAL", true, 0f, 0f, 0f, 0f, 0f, 0f)
             )
             colorNodeDao.insertNodes(defaultNodes)
             _colorNodes.value = defaultNodes
+        } else {
+            val node3 = _colorNodes.value.find { it.id == "node3" }
+            if (node3 != null && (!node3.isEnabled || node3.name != "Custom LUT")) {
+                val updatedNode3 = node3.copy(name = "Custom LUT", isEnabled = true)
+                colorNodeDao.insertNodes(listOf(updatedNode3))
+                _colorNodes.value = _colorNodes.value.map { if (it.id == "node3") updatedNode3 else it }
+            }
         }
     }
 
